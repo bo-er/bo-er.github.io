@@ -20,9 +20,9 @@ author: Wujiabang
 ###############################################
 
 navbar-links:
-  About Me: "Somebody that loves to learn and loves to share"
+  About Me: "Somebody who loves to learn and loves to share"
   Resources:
-  Author's home: "https://bo-er.github.com"
+  Author's home: "https://www.github.com/bo-er"
 
 ################
 # --- Logo --- #
@@ -47,13 +47,13 @@ round-avatar: true
 # Select the social network links that you want to show in the footer.
 # Uncomment the links you want to show and add your information to each one.
 social-network-links:
-  email: "someone@example.com"
-  rss: true  # remove this line if you don't want to show an RSS link at the bottom
-  facebook: deanattali
-  github: daattali
-  twitter: daattali
-  patreon: DeanAttali
-  youtube: c/daattali
+  email: "upperboer@icloud.com"
+  # rss: true  # remove this line if you don't want to show an RSS link at the bottom
+  # facebook: deanattali
+  github: https://www.github.com/bo-er
+  # twitter: daattali
+  # patreon: DeanAttali
+  # youtube: c/daattali
 #  medium: yourname
 #  reddit: yourname
 #  linkedin: daattali
