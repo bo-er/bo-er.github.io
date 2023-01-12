@@ -10,21 +10,19 @@
 ############################
 
 # Name of website
-title: My Website
+title: BOER's Stack Overflows
 
 # Your name to show in the footer
-author: Some Person
+author: Wujiabang
 
 ###############################################
 # --- List of links in the navigation bar --- #
 ###############################################
 
 navbar-links:
-  About Me: "aboutme"
+  About Me: "Somebody that loves to learn and loves to share"
   Resources:
-    - Beautiful Jekyll: "https://beautifuljekyll.com"
-    - Learn markdown: "https://www.markdowntutorial.com/"
-  Author's home: "https://deanattali.com"
+  Author's home: "https://bo-er.github.com"
 
 ################
 # --- Logo --- #
