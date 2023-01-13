@@ -100,7 +100,7 @@ Do computers hate "goto"? Of course not! As explained at the beginning of this a
 We have seen that "goto" can be helpful in assembly language by giving examples like loops and if-else statements. However, for high-level programming, we shouldn't be using them in these scenarios since "goto" will not improve but undermine readability and maintainability in such cases.  
 Where "goto" still fits in high-level programming languages is error handling, especially for languages lacking try-catch mechanisms like C and GO.     
 
-On Wikipedia's "Goto" page, I found content that share a similar view from the author of _The C Programming Language_ :
+On Wikipedia's "Goto" page, I found content that share a similar view, it's from the author of _The C Programming Language_ :
 
 >In The C Programming Language, Brian Kernighan and Dennis Ritchie warn that goto is "infinitely abusable" but also suggest that it could be used for end-of-function error handlers and multi-level breaks from loops. These two patterns can be found in numerous subsequent books on C by other authors; a 2007 introductory textbook notes that the error handling pattern is a way to work around the "lack of built-in exception handling within the C language.
 
