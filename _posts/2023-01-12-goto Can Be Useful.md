@@ -7,15 +7,15 @@ tags: [GO,goto,panic-recover]
 comments: true
 ---
 
-In a 1968 paper, Dijkstra wrote 'GOTO Considered Harmful,' arguing that a "goto" would generally decrease code readability and undermine the program's maintainability. His argument is based on common sense: if the code is hard to read, it must also be hard to debug. In other words, you have to understand the code before you can make any modifications to it.
+In a 1968 paper, Dijkstra wrote "GOTO Considered Harmful," arguing that a "goto" would generally decrease code readability and undermine the program's maintainability. His argument is based on common sense: if the code is hard to read, it must also be hard to debug. In other words, you have to understand the code before you can make any modifications to it.
 
 But if a "goto" can be so harmful, why was it introduced into the C language and so many other computer languages of the C family? This is presumably because "goto" was invented and heavily used in assembly language in an era without a high-level programming language. And by "harmful," Dijkstra didn't oppose the existence of "goto." What he fought against was the abusive use of "goto" in the 80s, which led to the "spaghetti code" of FORTRAN programs.
 
 ## goto is everywhere in the Assembly code
 
-Recently, I have been reading a book named "Computer Science: A Programmer's Perspective." In this book, the assembly language version of "goto": "jmp," is not considered "harmful" but rather "useful." There are two approaches to transfer execution in assembly: jump and branching, the former is used for transferring execution unconditionally, and the latter is used for transferring execution conditionally. The "goto" in modern computer language is a legacy of assembly languages from the earliest days of programming.
+Recently, I have been reading a book named "Computer Science: A Programmer's Perspective." In this book, the assembly language version of "goto": "jmp," is not considered "harmful" but rather "useful." There are two approaches to transfer execution in assembly: jump and branching; the former is used for transferring execution unconditionally, and the latter is used for transferring execution conditionally. The "goto" in modern computer language is a legacy of assembly languages from the earliest days of programming.
 
-Now, You might wonder where "goto"'s place is in the assembly code. Here is an example of a simple if-else C code:
+Now, you might wonder where "goto"'s place is in the assembly code. Here is an example of a simple if-else C code:
 
 ```C  
 if (test-expr)  
@@ -94,15 +94,15 @@ add_to_one:
 ```
 
   
-## Where goto fits in modern languages
+## Where does goto fit in modern languages?
 
 Do computers hate "goto"? Of course not! As explained at the beginning of this article, "goto" is considered harmful because it undermines the readability and maintainability of the program when misused.  
 We have seen that "goto" can be helpful in assembly language by giving examples like loops and if-else statements. However, for high-level programming, we shouldn't be using them in these scenarios since "goto" will not improve but undermine readability and maintainability in such cases.  
 Where "goto" still fits in high-level programming languages is error handling, especially for languages lacking try-catch mechanisms like C and GO.     
 
-On Wikipedia's "Goto" page, I found content that share a similar view, it's from the author of _The C Programming Language_ :
+On Wikipedia's "Goto" page, I found content that shared a similar view; it's from the author of _The C Programming Language_ :
 
->In The C Programming Language, Brian Kernighan and Dennis Ritchie warn that goto is "infinitely abusable" but also suggest that it could be used for end-of-function error handlers and multi-level breaks from loops. These two patterns can be found in numerous subsequent books on C by other authors; a 2007 introductory textbook notes that the error handling pattern is a way to work around the "lack of built-in exception handling within the C language.
+>In The C Programming Language, Brian Kernighan and Dennis Ritchie warn that goto is "infinitely abusable," but also suggest that it could be used for end-of-function error handlers and multi-level breaks from loops. These two patterns can be found in numerous subsequent books on C by other authors; a 2007 introductory textbook notes that the error handling pattern is a way to work around the "lack of built-in exception handling within the C language."
 
   
 ### End-of-function error handling  
@@ -192,7 +192,7 @@ func main(){
 
 ```
 
-### Retry after an error occurred
+### Retry after an error has occurred
 ```GO
 func retryableConnect(b backoff) {
 Connect:
@@ -205,13 +205,13 @@ Connect:
 }
 ```
 
-The above examples are simple and can be categorized as "local goto", they're local since a typical "goto" is defined and used within a single function block. Besides local "goto" there is another concept called non-local goto.
+The above examples are simple and can be categorized as "local goto," they're local since a typical "goto" is defined and used within a single function block. Besides local "goto," there is another concept called "non-local goto."
 
 ## Panic and recover: a new nonlocal magic
 
 Panic and recover are features of GO; you might be wondering why their combination is also a type of "goto." This is because, in essence, "goto" is an unconditional branch-taking keyword. The behavior of panic and recover in GO is analogous to "goto": the code panics in one place and "jumps" to the recover part of the code. The panic and recover in GO work beyond the "local goto" discussed above, given their ability to break function boundaries. 
 
-Below is a sample GO code illustrating the "non-local goto". I also call it the GO implementation of try-catch error handling:
+Below is a sample GO code illustrating the "non-local goto." I also call it the GO implementation of try-catch error handling:
 
 ```GO  
 func catch() {  
@@ -290,7 +290,7 @@ int main(int argc, char **argv)
 }  
 ```
 
-Why does C not support using a simple"goto" to jump to another function? This is primarily because, in C, there is no such thing as a "nested function," and a C programmer can't define a function inside another. As a result, the compiler can't be sure when function A that calls "goto L1" runs, whether another function B that contains the label "L1" is also on the stack frame. The label L1 used by "goto" is like any label in assembly code; it's associated with an address; therefore, the address where the program "goto" must have already been on the stack, which isn't always true. 
+Why does C not support using a simple "goto" to jump to another function? This is primarily because, in C, there is no such thing as a "nested function," and a C programmer can't define a function inside another. As a result, the compiler can't be sure when function A that calls "goto L1" runs, whether another function B that contains the label "L1" is also on the stack frame. The label L1 used by "goto" is like any label in assembly code; it's associated with an address; therefore, the address where the program "goto" must have already been on the stack, which isn't always true. 
 
 ```C
 int B(){
@@ -341,11 +341,11 @@ longjmp:
 	jmp *56(%rdi)           /* goto saved address without altering rsp */
 ```
 
-In the assembly code of "setjmp", instruction 1 saves the value stored in %rbx into %rdi; in x86-64, %rdi is used to save the first argument of a function call. In our case of "setjmp," this first and only argument has a type of "jump_buf," which is an int array that stores information of callee saved registers so that the program may restore its calling environment later. 
+In the assembly code of "setjmp," instruction 1 saves the value stored in %rbx into %rdi; in x86-64, %rdi is used to save the first argument of a function call. In our case of "setjmp," this first and single argument has a type of "jump_buf," which is an int array that stores information of callee saved registers so that the program may restore its calling environment later. 
 
-The following instructions 2,3,4,5,6,(9 && 10) save addresses of callee saved registers into jump_buf(jump_buf[0],jump_buf[1]...); this is because they're "callee saved". The name "callee saved" means they must be saved by the callee and restored when returned from the callee. 
+The following instructions (2,3,4,5,6,9,10) save addresses of callee saved registers into jump_buf(jump_buf[0],jump_buf[1]...). Is it necessary to do this? The answer is "yes." This is because they're "callee saved." The name "callee saved" means they must be saved by the callee and restored when returned from the callee.
 
-When "longjmp" is called, the saved register values and the stack pointer are restored, and execution jumps back to the return address of setjmp's caller. This is how the magic happens! The program is now running as it has just returned from "setjmp"!
+When "longjmp" is called, the saved register values and the stack pointer are restored, and execution jumps back to the return address of "setjmp." This is when the magic happens! The program is now running as it has just returned from "setjmp"!
 
 ### why goto alone can't perform non-local magic in GO
 
@@ -373,7 +373,7 @@ The reason behind this design decision is not given by the GO doc but can be gue
 
 ### nonlocal goto is used by the standard GO library
 
-In the Go standard library "json", encodeState's method marshal recovers from a jsonError panic. This panic is not fabricated to stop the program; it intends to break out of nested loops of marshaling different fields.
+In the Go standard library "json," encodeState's method marshal recovers from a jsonError panic. This panic is not fabricated to stop the program; it intends to break out of nested loops of marshaling different fields.
 
 ```GO
 	// jsonError is an error wrapper type for internal use only.
@@ -441,7 +441,7 @@ func Test_PanicRecoverAcrossGoroutines(t *testing.T) {
 
 ```
 
-The answer is a sad no. This behavior is documented in [# The Go Programming Language Specification](https://go.dev/ref/spec#Handling_panics)
+The answer is sad "no." This behavior is documented in the [# The Go Programming Language Specification](https://go.dev/ref/spec#Handling_panics)
 
 >The return value of `recover` is `nil` if any of the following conditions hold:
 
@@ -451,8 +451,8 @@ The answer is a sad no. This behavior is documented in [# The Go Programming Lan
 
 Since the goroutine of the test function, Test_PanicRecoverAcrossGoroutines is not panicking, the deferred function catchError has no effect on the panic.
 
-The restriction that a panic can't be recovered from another goroutine is explained in [Effective GO](https://go.dev/doc/effective_go#panic). A panic immediately stops the execution of the current function and begins unwinding the goroutine's stack; unwinding means stack unwinding; it's a process of removing function entries from the stack at runtime, running any deferred functions along the way. This is why we must recover in a deferred function, and no function may run at the unwinding stage except the deferred one. The program dies if that unwinding reaches the top of the goroutine's stack. Therefore, if we try to recover the panic outside of the scope of the goroutine, the effort is in vain since the deferred recover function outside of the goroutine's scope has no effect.
+The restriction that a panic can't be recovered from another goroutine is explained in [Effective GO](https://go.dev/doc/effective_go#panic). A panic immediately stops the execution of the current function and begins unwinding the goroutine's stack. Unwinding means stack unwinding; it's a process of removing function entries from the stack at runtime, running any deferred functions along the way. This is why we must recover in a deferred function, and no function may run at the unwinding stage except the deferred one. The program dies if that unwinding reaches the top of the goroutine's stack. Therefore, if we try to recover the panic outside of the scope of the goroutine, the effort is in vain since the deferred recover function outside of the goroutine's scope has no effect.
 
 ## Conclusion
 
-If you're an assembly programmer, you must use "goto" daily. If you use high-level programming languages like GO, you can use "goto" to improve your code's readability and maintainability in places like error handling. This article gives an example of using panic and recover together as a "non-local goto" in GO, just like the combination of "setjmp()" and "longjmp()" library functions in C. Of course, it has limitations, like the fact that you can't throw an error in one goroutine and try to catch it in another.  Anyway, the main takeaway is that "goto" is not harmful when you use it in the right place.
+If you're an assembly programmer, you must use "goto" daily. If you use high-level programming languages like GO, you can use "goto" to improve your code's readability and maintainability in places like error handling. This article also gives an example of using panic and recover together as a "non-local goto" in GO, just like the combination of "setjmp()" and "longjmp()" library functions in C. Of course, the GO version has limitations, like the fact that you can't throw an error in one goroutine and try to catch it in another. Anyway, the main takeaway is that "goto" is not harmful when you use it in the right place.
