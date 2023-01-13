@@ -306,9 +306,9 @@ int A(){
 
 ### What is behind setjmp and longjmp
 
-You might wonder how "setjmp" and "longjmp" solve this problem. We may take a glance at musl libc's implementation to understand it: 
+You might wonder how "setjmp" and "longjmp" solve this problem. We may take a glance at musl libc's implementation to understand it. 
 
-assembly code of setjmp(http://git.musl-libc.org/cgit/musl/tree/src/setjmp/x86_64/setjmp.s ):
+The assembly code of setjmp(http://git.musl-libc.org/cgit/musl/tree/src/setjmp/x86_64/setjmp.s ) is:
 ```assembly
 setjmp:
 1	mov %rbx,(%rdi)         
@@ -325,7 +325,7 @@ setjmp:
 12	ret
 ```
 
-assembly code of longjmp(http://git.musl-libc.org/cgit/musl/tree/src/setjmp/x86_64/longjmp.s):
+The assembly code of longjmp(http://git.musl-libc.org/cgit/musl/tree/src/setjmp/x86_64/longjmp.s) is:
 ```assembly
 longjmp:
 	xor %eax,%eax
@@ -341,7 +341,7 @@ longjmp:
 	jmp *56(%rdi)           /* goto saved address without altering rsp */
 ```
 
-In the assembly code of "setjmp," instruction 1 saves the value stored in %rbx into %rdi; in x86-64, %rdi is used to save the first argument of a function call. In our case of "setjmp," this first and single argument has a type of "jump_buf," which is an int array that stores information of callee saved registers so that the program may restore its calling environment later. 
+In the assembly code of "setjmp," instruction 1 saves the value stored in %rbx into %rdi; in x86-64, %rdi is used to save the first argument of a function call. In our case of "setjmp," the "first argument" to setjmp is of type "jump_buf," which is an int array that stores information of callee saved registers so that the program may restore its calling environment later.
 
 The following instructions (2,3,4,5,6,9,10) save addresses of callee saved registers into jump_buf(jump_buf[0],jump_buf[1]...). Is it necessary to do this? The answer is "yes." This is because they're "callee saved." The name "callee saved" means they must be saved by the callee and restored when returned from the callee.
 
