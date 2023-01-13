@@ -347,7 +347,7 @@ The following instructions (2,3,4,5,6,9,10) save addresses of callee saved regis
 
 When "longjmp" is called, the saved register values and the stack pointer are restored, and execution jumps back to the return address of "setjmp." This is when the magic happens! The program is now running as it has just returned from "setjmp"!
 
-### why goto alone can't perform non-local magic in GO
+### Why goto alone can't perform non-local magic in GO
 
 When it comes to GO, the language does allow nested functions; however, let alone jumping across functions, GO even doesn't allow "goto" its outer/inner function, as explained in the GO Specification:
 >"The scope of a label is the body of the function, in which it is declared and excludes the body of any nested function."
@@ -371,7 +371,7 @@ Greeting:
 
 The reason behind this design decision is not given by the GO doc but can be guessed. First, there are no compelling reasons for the GO team to implement the feature. Second, by supporting it, the compiler would be more complex than it is now.
 
-### nonlocal goto is used by the standard GO library
+### Non-local goto is used by the standard GO library
 
 In the Go standard library "json," encodeState's method marshal recovers from a jsonError panic. This panic is not fabricated to stop the program; it intends to break out of nested loops of marshaling different fields.
 
@@ -396,7 +396,7 @@ In the Go standard library "json," encodeState's method marshal recovers from a
      }
 ```
 
-### try-catch across goroutines is not possible
+### Try-catch across goroutines is not possible
 
 In GO, calling "t.Fatal" from a non-test goroutine is not advised as it may produce unexpected behavior.
 There is an example that fails to pass the "go vet" command:
@@ -441,7 +441,7 @@ func Test_PanicRecoverAcrossGoroutines(t *testing.T) {
 
 ```
 
-The answer is sad "no." This behavior is documented in the [# The Go Programming Language Specification](https://go.dev/ref/spec#Handling_panics)
+The answer is "no." This behavior is documented in "The Go Programming Language Specification"
 
 >The return value of `recover` is `nil` if any of the following conditions hold:
 
@@ -451,7 +451,7 @@ The answer is sad "no." This behavior is documented in the [# The Go Programming
 
 Since the goroutine of the test function, Test_PanicRecoverAcrossGoroutines is not panicking, the deferred function catchError has no effect on the panic.
 
-The restriction that a panic can't be recovered from another goroutine is explained in [Effective GO](https://go.dev/doc/effective_go#panic). A panic immediately stops the execution of the current function and begins unwinding the goroutine's stack. Unwinding means stack unwinding; it's a process of removing function entries from the stack at runtime, running any deferred functions along the way. This is why we must recover in a deferred function, and no function may run at the unwinding stage except the deferred one. The program dies if that unwinding reaches the top of the goroutine's stack. Therefore, if we try to recover the panic outside of the scope of the goroutine, the effort is in vain since the deferred recover function outside of the goroutine's scope has no effect.
+The restriction that a panic can't be recovered from another goroutine is explained in "Effective GO". A panic immediately stops the execution of the current function and begins unwinding the goroutine's stack. Unwinding means stack unwinding; it's a process of removing function entries from the stack at runtime, running any deferred functions along the way. This is why we must recover in a deferred function, and no function may run at the unwinding stage except the deferred one. The program dies if that unwinding reaches the top of the goroutine's stack. Therefore, if we try to recover the panic outside of the scope of the goroutine, the effort is in vain since the deferred recover function outside of the goroutine's scope has no effect.
 
 ## Conclusion
 
