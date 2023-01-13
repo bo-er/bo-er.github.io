@@ -133,6 +133,9 @@ Err:
     return err  
 }
 
+
+
+
 func badHandling() error {
 
 var err error
@@ -166,32 +169,12 @@ if err = D(); err != nil {
     return err  
     }  
 }
-
-    
-func PrintLogOnly(e error) bool {  
-    return false  
-}
-
-func A() error {  
-    return nil  
-}
-
-func B() error {  
-    return nil  
-}
-
-func C() error {  
-    return nil  
-}
-
-func D() error {  
-    return nil  
-}  
+ 
 ```
 
 It's evident that the combination of "goto" and the label "Err" makes the error-handling code nicer and cleaner. Our goal of improving code readability and maintainability has been achieved.
 
-### Breaking multi-level loops
+### Breaking out of nested loops
 Here is a GO example illustrating this:  
 ```GO
 
@@ -207,6 +190,19 @@ func main(){
         return  
 }
 
+```
+
+### Retry after an error occurred
+```GO
+func retryableConnect(b backoff) {
+Connect:
+
+	if err := connect(); err != nil {
+		log.Println("failed to connect, will retry: ", err.Error())
+		time.Sleep(b.GetBackoffTime())
+		goto Connect
+	}
+}
 ```
 
 The above examples are simple and can be categorized as "local goto", they're local since a typical "goto" is defined and used within a single function block. Besides local "goto" there is another concept called non-local goto.
@@ -459,4 +455,4 @@ The restriction that a panic can't be recovered from another goroutine is explai
 
 ## Conclusion
 
-If you're an assembly programmer, you must use "goto" daily. If you use high-level programming languages like GO, you can use "goto" to improve your code's readability and maintainability in places like error handling. This article gives an example of using panic and recover together as a "non-local goto" in GO, just like the combination of "setjmp()" and "longjmp()" library functions in C. Of course, it has limitations, like the fact that you can't throw an error in one goroutine and try to catch it in another. Anyway, the main takeaway is that "goto" is not harmful when you use it in the right place.
+If you're an assembly programmer, you must use "goto" daily. If you use high-level programming languages like GO, you can use "goto" to improve your code's readability and maintainability in places like error handling. This article gives an example of using panic and recover together as a "non-local goto" in GO, just like the combination of "setjmp()" and "longjmp()" library functions in C. Of course, it has limitations, like the fact that you can't throw an error in one goroutine and try to catch it in another.  Anyway, the main takeaway is that "goto" is not harmful when you use it in the right place.
