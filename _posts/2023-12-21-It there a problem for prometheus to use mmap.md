@@ -36,7 +36,7 @@ Moreover, we need to understand that a "syscall switch" is not a real "context s
 
 These steps are not costly at all, and even a process-level context switch is not that costly on a modern computer. Below are two code snippets that you can run on your own machine.On an Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz cloud machine (2 cores) from Alibaba Cloud, running the first code snippet shows that the process- context switch takes about 1800ns on average, while the second shows that it takes about 380ns on average to execute a lightweight `getpid` system call. These two numbers are not scary in any way.
 
-```C++
+```
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -123,7 +123,7 @@ exit(2);
 }
 ```
 
-```C++
+```
 #include <sys/time.h>
 #include <unistd.h>
 #include <assert.h>
@@ -176,7 +176,7 @@ ssize_t read(int fd, void *buf, size_t count);
 ```
 In prometheus, a mmaped file is defined as:
 
-```GO
+```
 type MmapFile struct {  
 f *os.File  // MmapFile is closable with os.File
 b []byte  
@@ -202,7 +202,7 @@ However, a DBMS that has a buffer pool typically uses `O_DIRECT` to read/write a
 Why mmap is easy to use? Let's see how Prometheus is using it.
 Here is some Prometheus code in `prometheus/tsdb/index/index.go` that shows how to use mmap:
 
-```GO
+```
 // code that shows how Bytes() may be used
 hash := crc32.Checksum(w.symbolFile.Bytes()[w.toc.Symbols+4:hashPos], castagnoliTable)  
 ```
@@ -234,7 +234,7 @@ The first two problems can be summaried as the DBMS loses control over page faul
 
 One of the most important resources in Linux is virtual memory, where a process's virtual memory space is described by `mm_struct`( the memory descriptor). This structure contains all the information related to the process's address space. Since there is only one mm_struct for a single process, a multi-threaded process that uses mmap is challenged by the contention problem brought up by a reader/writer semaphore called `mmap_lock`(in Linux kernel 5.8 it's renamed from `mmap_sem` to `mmap_lock`), it's a semaphore that controls changes to process memory mappings. Like any other `rw_semaphore`, it can be held by any number of shared readers or **one exclusive writer**.
 
-```C
+```
 struct mm_struct {
 ...
 struct rw_semaphore mmap_lock;            /* memory area semaphore */
@@ -259,7 +259,7 @@ mmap_lock's responsibilities can be summarized as:
 Why does Linux use a heavy lock - mmap_lock to protect VMAs? The reason is historical, mmap_lock has been a part of the mm structure for decades. At the time, programs did not use multi-threading but rather "multi-processing"(think about PostgreSQL...),different processes have different virtual memory spaces. The mmap_lock contention was not a problem back then. Besides, computer memory at that time was much  smaller, therefore, mmap_lock has fewer pages to lock.
 Now, you may have another question: both read/write systemcall and mmap work with VMAs, why is mmap  particularly a victim to mmap_sem? This is because, in the case of page faults, this lock is acquired as a read lock. In the case of mmap/munmap this lock is acquired as a write lock ([see this](https://github.com/torvalds/linux/blob/3b8a9b2e6809d281890dd0a1102dc14d2cd11caf/mm/mmap.c#L1205)). When write lock comes into the picture, performance deteriorates dramatically.
 
-![how mmap_lock hurts page faults performance](/assets/img/2023_12_21_01.png)
+![how mmap_lock hurts page faults performance](/assets/img/2023_12_21_02.png)
 
 By the way, don't be confused by another lock named page_table_lockof mm-struct, they serve different purposes:
 - **mmap_sem**
@@ -277,7 +277,7 @@ By the way, don't be confused by another lock named page_table_lockof mm-struct,
 
 Here is a picture of shared-memory computer architecture. A computer has multiple cores but they all share one physical memory.
 
-![linux_memory_translation](/assets/img/2023_12_21_01.png)
+![linux_memory_translation](/assets/img/2023_12_21_03.png)
 
 In shared-memory architecture, every processor contains a cache named Translation lookaside buffer(TLB) as we have mentioned earlier. TLBs make virtual address translation fast and it's critical for database application performance.
 
@@ -361,7 +361,7 @@ Checkpointing is another concept in DBMS that always comes in pair with WAL. WAL
 The complete function call chains can be simplified as the following graph.
 ![prometheus_tsdb](/assets/img/2023_12_21_04.png)
 Whether a head is compactable is determined by the following code, since chunkRange is by default 2h,  therefore the head is compactable every 3 hours.
-```go
+```
 // compactable returns whether the head has a compactable range.// The head has a compactable range when the head time range is 1.5 times the chunk range.// The 0.5 acts as a buffer of the appendable window.  
 func (h *Head) compactable() bool {  
 return h.MaxTime()-h.MinTime() > h.chunkRange.Load()/2*3  
@@ -390,7 +390,7 @@ prometheus-data
   |___000000077
 ```  
 To figure out why the lower two thirds of segments are checkpointed we have to read some source code in prometheus/tsdb/head.go:
-```GO
+```
 // truncateWAL removes old data before mint from the WAL.
 func (h *Head) truncateWAL(mint int64) error {
 1   first, last, err := wlog.Segments(h.wal.Dir())
@@ -412,7 +412,7 @@ func (h *Head) truncateWAL(mint int64) error {
 ```
 To make facts more clear here are two ls -l outputs before a checkpointing and after a checkpointing:
 Before the next checkpointing:
-```GO
+```
 -rw-r--r-- 1 actiontech-universe actiontech 19300352 2月  11 07:00 00000008
 -rw-r--r-- 1 actiontech-universe actiontech 19300352 2月  11 09:00 00000009
 -rw-r--r-- 1 actiontech-universe actiontech 19300352 2月  11 11:00 00000010
@@ -420,7 +420,7 @@ Before the next checkpointing:
 drwxr-xr-x 2 actiontech-universe actiontech       22 2月  11 09:00 checkpoint.00000007
 ```
 After the next checkpointing:
-```GO
+```
 -rw-r--r-- 1 actiontech-universe actiontech 17334272 2月  11 12:47 00000011
 -rw-r--r-- 1 actiontech-universe actiontech  1966080 2月  11 13:00 00000012
 -rw-r--r-- 1 actiontech-universe actiontech 19300352 2月  11 15:00 00000013
@@ -431,8 +431,8 @@ These two outputs show that checkpoint.00000010 is created right after 00000012.
 
 # Conclusion
 
-mmap is an old concept, it was born at a time when computer memories were small and programs weren't multi-threading. mmap based file IO is beaten hard by the direct IO by benchmark due to problems mentioned previously.
-The TSDB of Prometheus works like a log structured merge tree. Unlike relational databases like MySQL, the workload of Prometheus is write-heavy, new data is constantly written to Prometheus's head chunk, which indeed is buffered and is not memory-mapped, performance issues that hurt mmap performance are irrelevant in this regard.
+mmap is an old concept, it was born at a time when computer memories were small and programs weren't multi-threading. mmap based file IO is hard-beaten by direct IO in benchmark due to problems mentioned above.
+The TSDB of Prometheus works like a log structured merge tree. Unlike relational databases such as MySQL,Postgresql, the workload of Prometheus is write-heavy, new data is constantly written to Prometheus's head chunk, which indeed is buffered and is not memory-mapped, performance issues that hurt mmap are irrelevant in this regard.
 Andy's paper references VictoriaMetrics's tech article "mmap may slow down your Go app" and tries to show that mmap is a problem for VictoriaMetrics. However, this is not true and VictoriaMetrics still uses mmap for file IO.
 
 References
