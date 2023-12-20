@@ -24,7 +24,7 @@ System calls were designed to bridge the gap between kernel and user memory. The
 Kernel related things like kernel data, kernel code, kernel stack and kernel heap segments live in the kernel memory area and are invisible to the user program, this is called memory segmentation. And this segmentation is the reason why system calls are needed: to safely hand over control to the kernel code with predefined and security-aware interfaces.
 When a user program invokes a system call, a "syscall switch" occurs. I prefer to call it "syscall switch" to ease the reader's mind, since the term "context switch" has traditionally been used for "process context switch". When we use mmap to map a file into virtual address space, only one system call is required: mmap(2). Instead, if we use pread/pwrite for file I/O, the program must make a syscall for each read/write operation. This is partly, as a common wisdom,why mmap is supposed to give better performance.
 
-The reason why a context switch is slow, is primarily due to the TLB (translation-lookaside buffer) flushing. The TLB is the fastest cache within a CPU that exploits locality. It caches page table entries, which are stored in each process's memory descriptor named mm_struct, which contains all memory areas of a process. Therefore, when a context switch occurs, PTEs of the TLB should be invalidated. This invalidation and the subsequent refilling of the cache make context switches slow. However, these are old facts, TLBs on modern computers are tagged, so a context switch does not necessarily flush a computer's TLB. Like what is described in armV8 documentation:
+The reason why a context switch is slow, is primarily due to the TLB (translation-lookaside buffer) flushing. The TLB is the fastest cache within a CPU that exploits locality. It caches page table entries, which are stored in each process's memory descriptor named `mm_struct`, which contains all memory areas of a process. Therefore, when a context switch occurs, PTEs of the TLB should be invalidated. This invalidation and the subsequent refilling of the cache make context switches slow. However, these are old facts, TLBs on modern computers are tagged, so a context switch does not necessarily flush a computer's TLB. Like what is described in armV8 documentation:
 For non-global entries, when the TLB is updated and the entry is marked as non-global, a value is stored in the TLB entry in addition to the normal translation information. This value is called the Address Space ID (ASID), which is a number assigned by the OS to each individual task. Subsequent TLB look-ups only match on that entry if the current ASID matches with the ASID that is stored in the entry. This permits multiple valid TLB entries to be present for a particular page marked as non-global, but with different ASID values. In other words, we do not necessarily need to flush the TLBs when we context switch.
 When a context switch takes place, the CPU may simply change the active ASID, it's why TLBs are now called taged TLBs. The point here is that even a context switch is not that costly on modern computers.
 
@@ -34,7 +34,7 @@ Moreover, we need to understand that a "syscall switch" is not a real "context s
 - CPL (current privilege level) is changed from 3 to 0. This level is segmentation related.
 - Sets the new PC to the system call handler (via code mapping)
 
-These steps are not costly at all, and even a process-level context switch is not that costly on a modern computer. Below are two code snippets that you can run on your own machine.On an Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz cloud machine (2 cores) from Alibaba Cloud, running the first code snippet shows that the process- context switch takes about 1800ns on average, while the second shows that it takes about 380ns on average to execute a lightweight getpid system call. These two numbers are not scary in any way.
+These steps are not costly at all, and even a process-level context switch is not that costly on a modern computer. Below are two code snippets that you can run on your own machine.On an Intel(R) Xeon(R) Gold 6148 CPU @ 2.40GHz cloud machine (2 cores) from Alibaba Cloud, running the first code snippet shows that the process- context switch takes about 1800ns on average, while the second shows that it takes about 380ns on average to execute a lightweight `getpid` system call. These two numbers are not scary in any way.
 
 ```C++
 #include <assert.h>
@@ -168,8 +168,9 @@ struct timeval t1, t2;
 
 When working with read/write operations, the kernel by default does not actually read from or write to a disk, but simply copies data between a buffer in user space and a page cache in kernel space. The reason for this is the same as why processors need an L1 and L2 cache: The kernel caches pages because reading from a file system, either over the network (e.g., NFS) or the local disk, is very slow compared to reading from memory.
 If a database does many I/O intensive operations, using mmap is considered faster since a user buffer is not involved, therefore, there is no need to copy the data from kernel buffer cache to the user buffer. This also helps saving computer memory.
+
+The linux manual of `read(2)` shows that a userspace buffer named buf is needed, that's the userspace buffer that the data is copied into.
 ```
-The linux manual of read(2) shows that a userspace buffer named buf is needed, that's the userspace buffer that the data is copied into.
 #include <unistd.h>
 ssize_t read(int fd, void *buf, size_t count);
 ```
@@ -194,12 +195,12 @@ return unix.Mmap(int(f.Fd()), 0, length, unix.PROT_READ, unix.MAP_SHARED)
 }
 ```
 
-Don't be misleaded by the b []byte, this b here is nothing but a pointer to our virtual memory, there is no data copied to userspace when Prometheus call unix.Map. Besides, from the above memory protection filed unix.PROT_READ you can see that Prometheus does not map writable memory, the memory mapping is read-only.
-However, a DBMS that has a buffer pool typically uses O_DIRECT to read/write a file, as another solution to the "double caching" problem. It buffers data objects on its own behalf in userspace and bypass the page cache that is provided by the virtual memory system. For example, MySQL uses innodb_flush_method=O_DIRECT  by default for reading/writing data files. Here I explicitly mentioned data files for the fact that the usage of O_DIRECT by pass the page cache, but it doesn't gurantee the file to be flushed into disk, therefore MySQL still uses fsync for its log files like redolog.
+Don't be misleaded by the `b []byte`, this b here is nothing but a pointer to our virtual memory, there is no data copied to userspace when Prometheus call unix.Map. Besides, from the above memory protection filed `unix.PROT_READ` you can see that Prometheus does not map writable memory, the memory mapping is read-only.
+However, a DBMS that has a buffer pool typically uses `O_DIRECT` to read/write a file, as another solution to the "double caching" problem. It buffers data objects on its own behalf in userspace and bypass the page cache that is provided by the virtual memory system. For example, MySQL uses `innodb_flush_method=O_DIRECT`  by default for reading/writing data files. Here I explicitly mentioned data files for the fact that the usage of `O_DIRECT` by pass the page cache, but it doesn't gurantee the file to be flushed into disk, therefore MySQL still uses `fsync` for its log files like redolog.
 
 ### Easy to use
 Why mmap is easy to use? Let's see how Prometheus is using it.
-Here is some Prometheus code in prometheus/tsdb/index/index.go that shows how to use mmap:
+Here is some Prometheus code in `prometheus/tsdb/index/index.go` that shows how to use mmap:
 
 ```GO
 // code that shows how Bytes() may be used
@@ -231,7 +232,7 @@ The first two problems can be summaried as the DBMS loses control over page faul
 
 ![linux virtual memory structure](/assets/img/2023_12_21_01.png)
 
-One of the most important resources in Linux is virtual memory, where a process's virtual memory space is described by mm_struct( the memory descriptor). This structure contains all the information related to the process's address space. Since there is only one mm_struct for a single process, a multi-threaded process that uses mmap is challenged by the contention problem brought up by a reader/writer semaphore called mmap_lock(in Linux kernel 5.8 it's renamed from mmap_sem to mmap_lock), it's a semaphore that controls changes to process memory mappings. Like any other rw_semaphore, it can be held by any number of shared readers or one exclusive writer.
+One of the most important resources in Linux is virtual memory, where a process's virtual memory space is described by `mm_struct`( the memory descriptor). This structure contains all the information related to the process's address space. Since there is only one mm_struct for a single process, a multi-threaded process that uses mmap is challenged by the contention problem brought up by a reader/writer semaphore called `mmap_lock`(in Linux kernel 5.8 it's renamed from `mmap_sem` to `mmap_lock`), it's a semaphore that controls changes to process memory mappings. Like any other `rw_semaphore`, it can be held by any number of shared readers or **one exclusive writer**.
 
 ```C
 struct mm_struct {
@@ -249,26 +250,28 @@ struct rw_semaphore mmap_lock;            /* memory area semaphore */
   unsigned long flags, vm_flags_t vm_flags,
   unsigned long pgoff, unsigned long *populate,
   struct list_head *uf)
-
+```
 mmap_lock's responsibilities can be summarized as:
 - protecting important mm_struct like red-black tree, the process VMA list and many other fileds of mm struct.(read this article: https://lwn.net/Articles/753058/)
 - protecting VMAs from changing during page fault handling (we can verify this by checkouting function do_page_fault on https://android.googlesource.com/kernel/msm/+/3ab322a9e0a419e7f378770c9edebca17821bf6e/arch/arm/mm/fault.c)
-```
+
 
 Why does Linux use a heavy lock - mmap_lock to protect VMAs? The reason is historical, mmap_lock has been a part of the mm structure for decades. At the time, programs did not use multi-threading but rather "multi-processing"(think about PostgreSQL...),different processes have different virtual memory spaces. The mmap_lock contention was not a problem back then. Besides, computer memory at that time was much  smaller, therefore, mmap_lock has fewer pages to lock.
-Now, you may have another question: both read/write systemcall and mmap work with VMAs, why is mmap  particularly a victim to mmap_sem? This is because, in the case of page faults, this lock is acquired as a read lock. In the case of mmap/munmap this lock is acquired as a write lock (see https://github.com/torvalds/linux/blob/3b8a9b2e6809d281890dd0a1102dc14d2cd11caf/mm/mmap.c#L1205 ). When write lock comes into the picture, performance deteriorates dramatically.
+Now, you may have another question: both read/write systemcall and mmap work with VMAs, why is mmap  particularly a victim to mmap_sem? This is because, in the case of page faults, this lock is acquired as a read lock. In the case of mmap/munmap this lock is acquired as a write lock ([see this](https://github.com/torvalds/linux/blob/3b8a9b2e6809d281890dd0a1102dc14d2cd11caf/mm/mmap.c#L1205)). When write lock comes into the picture, performance deteriorates dramatically.
 
 ![how mmap_lock hurts page faults performance](/assets/img/2023_12_21_01.png)
 
 By the way, don't be confused by another lock named page_table_lockof mm-struct, they serve different purposes:
-- mmap_sem
-  This is a long-lived lock which protects the VMA list for readers and writers. As callers of this lock require it for a long time and may need to sleep, a spinlock is inappropriate. A reader of the list takes this semaphore with down_read(). If they need to write, it is taken with down_write() and the page_table_lock spinlock is later acquired while the VMA linked lists are being updated.
-- page_table_lock
+- **mmap_sem**
+
+  This is a long-lived lock which protects the VMA list for readers and writers. As callers of this lock **require it for a long time** and may need to sleep, a spinlock is inappropriate. A reader of the list takes this semaphore with down_read(). If they need to write, it is taken with down_write() and **the page_table_lock spinlock is later acquired** while the VMA linked lists are being updated.
+- **page_table_lock**
+
   This protects most fields in mm_struct. As well as the page tables, it protects the RSS (see below) count and the VMA from modification.
   
 ### single-threaded page eviction
-  Although using mmap gives us the benefit of not using userspace buffer pool, it still relies on the page cache. The linux kernel maintains a set of least-recently-used (LRU) lists to track page cache. Thus, for a database that relies on mmap, it also relies on kswapd to perform efficiently.
-  kswapd is the kernel thread that is responsible for evicting pages from memory to disk when memory is running low. Since disk is much slower than memory, multi-threading is not necessary, therefore we have a single-threaded page evictor. Andy blames this single-threaded kswapd for losing the "fio versus mmap sequential read battle". However, it's also noteworthy to mention that the LRU list in Linux is protected by the LRU lock. This could also be another factor.
+  Although using mmap gives us the benefit of not using userspace buffer pool, it still relies on the page cache. The linux kernel maintains a set of least-recently-used (LRU) lists to track page cache. Thus, for a database that relies on mmap, it also relies on `kswapd` to perform efficiently.
+  kswapd is the kernel thread that is responsible for evicting pages from memory to disk when memory is running low. Since disk is much slower than memory, multi-threading is not necessary, therefore we have a single-threaded page evictor. Andy blames this single-threaded `kswapd` for losing the "fio versus mmap sequential read battle". However, it's also noteworthy to mention that the LRU list in Linux is protected by the LRU lock. This could also be another factor.
 
 ### TLB shootsdown
 
@@ -285,7 +288,7 @@ How Prometheus stores its data
 
 ## What have been memory-mapped
 
-On a machine that has umon(an wrapper of Prometheus) running on it, run cat /proc/{pid of umon}/maps, so you will get contiguous virtual memory areas used by Prometheus. The output from my machine is listed in the table below. In short, virtual addresses that are unused or used by shared object files are stripped off.  Shared libraries are memory-mapped so that forking a child process can be fast, and memory is saved since processes don't have to copy duplicate code into their text segments.
+On a machine that has umon(an wrapper of Prometheus) running on it, run `cat /proc/{pid of umon}/maps`, so you will get contiguous virtual memory areas used by Prometheus. The output from my machine is listed in the table below. In short, virtual addresses that are unused or used by shared object files are stripped off.  Shared libraries are memory-mapped so that forking a child process can be fast, and memory is saved since processes don't have to copy duplicate code into their text segments.
 ```
 00400000-044e3000 r-xp 00000000 fd:01 675313727                          /opt/umon/bin/umon
 046e2000-047ae000 rw-p 040e2000 fd:01 675313727                          /opt/umon/bin/umon
@@ -307,7 +310,7 @@ On a machine that has umon(an wrapper of Prometheus) running on it, run cat /pro
 7fcfc948e000-7fcfc97fb000 r--s 00000000 fd:01 239093592                  /opt/umon/prometheus-data/01GRNAS8RDR82J0X9V7H352736/chunks/000001
 7fd020346000-7fd02034b000 rw-s 00000000 fd:01 826468484                  /opt/umon/prometheus-data/queries.active
 ```
-Before further discussing we need to know a struct named vm_area_struct that describes a contiguous virtual memory area, each userspace mmap syscall from a process will create a vm_area_struct , which is stored at each process's task_struct maintained by the kernel. The output of cat /proc/pid/maps lists a part of the vm_area_struct,  let's pick one line of output and illustrate some of the important fields of this structure:
+Before further discussing we need to know a struct named `vm_area_struct` that describes a contiguous virtual memory area, each userspace mmap syscall from a process will create a `vm_area_struct` , which is stored at each process's `task_struct` maintained by the kernel. The output of `cat /proc/pid/maps` lists a part of the `vm_area_struct`,  let's pick one line of output and illustrate some of the important fields of this structure:
 ```
 7fcf9136d000-7fcf9936d000 r--s 00000000 fd:01 834677674                  /opt/umon/prometheus-data/chunks_head/000061
 ```
@@ -376,7 +379,8 @@ In Prometheus, checkpoint goes through all WAL files since minTime. This means m
 - record.Exemplars (Exemplars are references to data outside of the MetricSet. A common use case are IDs of program traces.)
 - record.Metadata (see issue #10972, metadata is all about series and their labels)
   Then WAL checkpointing creates a new checkpoint folder whose name is like checkpoint.00000xxx and writes all the data collected into this folder, just like WAL files are written into "wal", so don't be surprised if you open the folder and find a file named 00000000 inside of it. WAL files before 00000xxx can be delet
-  prometheus-data
+```  
+prometheus-data
   |____wal
   |___000000072
   |___000000073
@@ -384,7 +388,7 @@ In Prometheus, checkpoint goes through all WAL files since minTime. This means m
   |___000000075
   |___000000076
   |___000000077
-
+```  
 To figure out why the lower two thirds of segments are checkpointed we have to read some source code in prometheus/tsdb/head.go:
 ```GO
 // truncateWAL removes old data before mint from the WAL.
@@ -423,7 +427,7 @@ After the next checkpointing:
 -rw-r--r-- 1 actiontech-universe actiontech  1694088 2月  11 15:10 00000014
 drwxr-xr-x 2 actiontech-universe actiontech       22 2月  11 13:00 checkpoint.00000010
 ```
-These two outputs show that checkpoint.00000010 is created right after 00000012. This is because, from the above source code we can see that (last-first)*2/3 must be greater than 2(This number should be 1 without line 6), otherwise the function call returns. Since (12-8) multiplies 2/3 > 2, therefore, when log 00000012 was created, the next checkpointing was also created. After that, all old WAL files before the checkpoint are deleted by h.wal.Truncate and the old checkpoint is deleted via wlog.DeleteCheckpoints.
+These two outputs show that checkpoint.00000010 is created right after 00000012. This is because, from the above source code we can see that `(last-first)*2/3` must be greater than 2(This number should be 1 without line 6), otherwise the function call returns. Since `(12-8) x 2/3 > 2`, therefore, when log 00000012 was created, the next checkpointing was also created. After that, all old WAL files before the checkpoint are deleted by `h.wal.Truncate` and the old checkpoint is deleted via `wlog.DeleteCheckpoints`.
 
 # Conclusion
 
