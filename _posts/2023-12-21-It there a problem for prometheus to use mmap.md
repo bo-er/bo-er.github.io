@@ -25,8 +25,8 @@ Kernel related things like kernel data, kernel code, kernel stack and kernel hea
 When a user program invokes a system call, a "syscall switch" occurs. I prefer to call it "syscall switch" to ease the reader's mind, since the term "context switch" has traditionally been used for "process context switch". When we use mmap to map a file into virtual address space, only one system call is required: mmap(2). Instead, if we use pread/pwrite for file I/O, the program must make a syscall for each read/write operation. This is partly, as a common wisdom,why mmap is supposed to give better performance.
 
 The reason why a context switch is slow, is primarily due to the TLB (translation-lookaside buffer) flushing. The TLB is the fastest cache within a CPU that exploits locality. It caches page table entries, which are stored in each process's memory descriptor named `mm_struct`, which contains all memory areas of a process. Therefore, when a context switch occurs, PTEs of the TLB should be invalidated. This invalidation and the subsequent refilling of the cache make context switches slow. However, these are old facts, TLBs on modern computers are tagged, so a context switch does not necessarily flush a computer's TLB. Like what is described in armV8 documentation:
-For non-global entries, when the TLB is updated and the entry is marked as non-global, a value is stored in the TLB entry in addition to the normal translation information. This value is called the Address Space ID (ASID), which is a number assigned by the OS to each individual task. Subsequent TLB look-ups only match on that entry if the current ASID matches with the ASID that is stored in the entry. This permits multiple valid TLB entries to be present for a particular page marked as non-global, but with different ASID values. In other words, we do not necessarily need to flush the TLBs when we context switch.
-When a context switch takes place, the CPU may simply change the active ASID, it's why TLBs are now called taged TLBs. The point here is that even a context switch is not that costly on modern computers.
+>For non-global entries, when the TLB is updated and the entry is marked as non-global, a value is stored in the TLB entry in addition to the normal translation information. This value is called the Address Space ID (ASID), which is a number assigned by the OS to each individual task. Subsequent TLB look-ups only match on that entry if the current ASID matches with the ASID that is stored in the entry. This permits multiple valid TLB entries to be present for a particular page marked as non-global, but with different ASID values. In other words, we do not necessarily need to flush the TLBs when we context switch.
+>When a context switch takes place, the CPU may simply change the active ASID, it's why TLBs are now called taged TLBs. The point here is that even a context switch is not that costly on modern computers.
 
 Moreover, we need to understand that a "syscall switch" is not a real "context switch", but is often perceived as a "mode switch", which usually involves the following steps on a Intel processor:
 - Switching the SP (stack pointer) to the kernel stack.
@@ -216,7 +216,8 @@ Operating systems provide three address space operations of particular interest:
 - mmap creates memory mapping regions and adds them to the region tree.
 - munmap removes regions from the tree and invalidates entries in the hardware page table structures.
 - Page faults look up the faulting virtual address in the region tree and, if the virtual address is mapped, install an entry in the hardware page table and resume the application.  
-  In Andy's paper, he mentions three major problems:
+  
+In Andy's paper, he mentions three major problems:
 - Transactional safety
 - I/O stalls
     - No interfaces for asynchronous IO.
@@ -232,7 +233,7 @@ The first two problems can be summaried as the DBMS loses control over page faul
 
 ![linux virtual memory structure](/assets/img/2023_12_21_01.png)
 
-One of the most important resources in Linux is virtual memory, where a process's virtual memory space is described by `mm_struct`( the memory descriptor). This structure contains all the information related to the process's address space. Since there is only one mm_struct for a single process, a multi-threaded process that uses mmap is challenged by the contention problem brought up by a reader/writer semaphore called `mmap_lock`(in Linux kernel 5.8 it's renamed from `mmap_sem` to `mmap_lock`), it's a semaphore that controls changes to process memory mappings. Like any other `rw_semaphore`, it can be held by any number of shared readers or **one exclusive writer**.
+One of the most important resources in Linux is virtual memory, where a process's virtual memory space is described by `mm_struct`( the memory descriptor). This structure contains all the information related to the process's address space. Since there is only one `mm_struct` for a single process, a multi-threaded process that uses mmap is facing the contention problem brought up by a reader/writer semaphore called `mmap_lock`(in Linux kernel 5.8 it's renamed from `mmap_sem` to `mmap_lock`), it's a semaphore that controls changes to process memory mappings. Like any other `rw_semaphore`, it can be held by any number of shared readers or **one exclusive writer**.
 
 ```
 struct mm_struct {
@@ -257,21 +258,21 @@ mmap_lock's responsibilities can be summarized as:
 
 
 Why does Linux use a heavy lock - mmap_lock to protect VMAs? The reason is historical, mmap_lock has been a part of the mm structure for decades. At the time, programs did not use multi-threading but rather "multi-processing"(think about PostgreSQL...),different processes have different virtual memory spaces. The mmap_lock contention was not a problem back then. Besides, computer memory at that time was much  smaller, therefore, mmap_lock has fewer pages to lock.
-Now, you may have another question: both read/write systemcall and mmap work with VMAs, why is mmap  particularly a victim to mmap_sem? This is because, in the case of page faults, this lock is acquired as a read lock. In the case of mmap/munmap this lock is acquired as a write lock ([see this](https://github.com/torvalds/linux/blob/3b8a9b2e6809d281890dd0a1102dc14d2cd11caf/mm/mmap.c#L1205)). When write lock comes into the picture, performance deteriorates dramatically.
+Now, you may have another question: both read/write systemcall and mmap work with VMAs, why is mmap  particularly a victim to mmap_lock? This is because, in the case of page faults, this lock is acquired as a read lock. In the case of mmap/munmap this lock is acquired as a write lock ([see this](https://github.com/torvalds/linux/blob/3b8a9b2e6809d281890dd0a1102dc14d2cd11caf/mm/mmap.c#L1205)). When write lock comes into the picture, performance deteriorates dramatically.
 
 ![how mmap_lock hurts page faults performance](/assets/img/2023_12_21_02.png)
 
-By the way, don't be confused by another lock named page_table_lockof mm-struct, they serve different purposes:
-- **mmap_sem**
-
-  This is a long-lived lock which protects the VMA list for readers and writers. As callers of this lock **require it for a long time** and may need to sleep, a spinlock is inappropriate. A reader of the list takes this semaphore with down_read(). If they need to write, it is taken with down_write() and **the page_table_lock spinlock is later acquired** while the VMA linked lists are being updated.
+By the way, don't be confused by another lock named `page_table_lock` of mm-struct, they serve different purposes:
+- **mmap_lock**
+  
+    This is a long-lived lock which protects the VMA list for readers and writers. As callers of this lock **require it for a long time** and may need to sleep, a spinlock is inappropriate. A reader of the list takes this semaphore with down_read(). If they need to write, it is taken with down_write() and **the page_table_lock spinlock is later acquired** while the VMA linked lists are being updated.
 - **page_table_lock**
-
+  
   This protects most fields in mm_struct. As well as the page tables, it protects the RSS (see below) count and the VMA from modification.
   
 ### single-threaded page eviction
   Although using mmap gives us the benefit of not using userspace buffer pool, it still relies on the page cache. The linux kernel maintains a set of least-recently-used (LRU) lists to track page cache. Thus, for a database that relies on mmap, it also relies on `kswapd` to perform efficiently.
-  kswapd is the kernel thread that is responsible for evicting pages from memory to disk when memory is running low. Since disk is much slower than memory, multi-threading is not necessary, therefore we have a single-threaded page evictor. Andy blames this single-threaded `kswapd` for losing the "fio versus mmap sequential read battle". However, it's also noteworthy to mention that the LRU list in Linux is protected by the LRU lock. This could also be another factor.
+  kswapd is the kernel thread that is responsible for evicting pages from memory to disk when memory is running low. Since disk is much slower than memory, multi-threading is not necessary, therefore we have a single-threaded page evictor. Andy blames this single-threaded `kswapd` for mmap losing the "fio versus mmap sequential read battle". However, it's also noteworthy to mention that the LRU linked list in Linux is protected by the LRU lock. This could also be another factor.
 
 ### TLB shootsdown
 
@@ -282,9 +283,10 @@ Here is a picture of shared-memory computer architecture. A computer has multipl
 In shared-memory architecture, every processor contains a cache named Translation lookaside buffer(TLB) as we have mentioned earlier. TLBs make virtual address translation fast and it's critical for database application performance.
 
 When memory mapping changes, for example, tag 0x001 points to physical page number 0x0011, it points to 0x0012 afterward, coherence must be guaranteed among the processors. Since there is no hardware mechanism to ensure TLB coherence, the job is left to the Operating System.
-To ensure TLB coherence, the Operating System performs a TLB shootdown, which is a mechanism to invalidate remote TLB entries on other cores. TLB shootdown can be triggered by various memory operations that modify page table entries. One of the reasons is releated to munmap, which deletes the mappings for the specified address range, and causes further references to addresses within the range to generate invalid memory references.
+To ensure TLB coherence, the Operating System performs a TLB shootdown, which is a mechanism to invalidate remote TLB entries on other cores. TLB shootdown can be triggered by various memory operations that modify page table entries. One of the reasons is related to munmap, which deletes the mappings for the specified address range, and causes further references to addresses within the range to generate invalid memory references.
 On the other hand, when a process calls mmap and the OS creates new entries in the process's virtual address space, the OS does not need to flush the TLB since there are no TLB entries at the time.
-How Prometheus stores its data
+
+# How Prometheus stores its data
 
 ## What have been memory-mapped
 
@@ -317,22 +319,22 @@ Before further discussing we need to know a struct named `vm_area_struct` that d
 This line has six fields and two of them are not part of vm_area_struct: device number(fd:01) and inode number(834677674).
 -   `vm_start`, `vm_end`
     7fcf9136d000 is the beginning address of the memory area
-    7fcf9936d000 is the end address of the memory area
+    7fcf9936d000 is the end address of the memory area.
 -   `vm_file`
     /opt/umon/prometheus-data/chunks_head/000061 is the pointer to the associated file structure.
 -   `vm_pgoff`
-    00000000 is the offset of the area within the file;
+    00000000 is the offset of the area within the file.
 -  `pgprot_t`
-   r--s defines access permissions of the memory area. The suffix s means this area is "shared". This means changes to that area will be written back to the file and be visible to all processes.
-   r-- means this area is read-only, the second placeholder is for w(write) and the third id for x(execute). This permission shows that this Prometheus memory-mapped file is read-only and shared.
+   `r--s` defines access permissions of the memory area. The suffix s means this area is "shared". This means changes to that area will be written back to the file and be visible to all processes.
+   `r--` means this area is read-only, the second placeholder is for w(write) and the third id for x(execute). This permission shows that this Prometheus memory-mapped file is read-only and shared.
 -   `vm_flags`
     a set of flags, not shown in the output.
 -   `vm_ops`
-    a set of working functions for this area, not shown in the output
+    a set of working functions for this area, not shown in the output.
 -   `vm_next`, `vm_prev`
-    memory areas of umon are chained by a list structure,not shown in the output
+    memory areas of umon are chained by a list structure,not shown in the output.
 
-So far, we have learned that Prometheus maps multiple files under the `prometheus-data` folder(it should have been "data", but umon uses"prometheus-data"), what are these files and why they're memory-mapped? To explain it, some basic prometheus 101 knowledge needs to be clarified.
+So far, we have learned that Prometheus maps multiple files under the `prometheus-data` folder, what are these files and why they're memory-mapped? To explain it, some basic prometheus 101 knowledge needs to be clarified.
 
 ## How Prometheus persists its data
 
@@ -344,7 +346,7 @@ Series_B -> (t0,B0), (t1, B1), (t2, B2), (t3, B3)...
 Series_C -> (t0,C0), (t1, C1), (t2, C2), (t3, C3)...
 ```
 
-With possibly up to millions of data points per second,  can Prometheus directly write everything into the storage device? Think about this: For a  traditional disk, random write is a disaster since the disk head needs time to seek the track and the plate needs time to spin. For an SSD, writing to a non-empty block is done by first writing to an empty block and moving the data back. This is called "write amplification" and can significantly shorten the lifespan of the SSD.
+For a Monitoring System, with possibly up to millions of data points per second,  can Prometheus directly write everything into the storage device? Think about this: For a  traditional disk, random write is a disaster since the disk head needs time to seek the track and the plate needs time to spin. For an SSD, writing to a non-empty block is done by first writing to an empty block and moving the data back. This is called "write amplification" and can significantly shorten the lifespan of the SSD.
 Therefore, Prometheus has no choice other than using a buffer to batch writes. Otherwise, the penalty could be huge. Where is this memory-buffer in Prometheus? The answer is a "head chunk".  To be more accurate, it's actually a 32KB page in the head chunk. The behavior is comparable to Innodb engine, who also doesn't work on rows but on pages. But unlike Innodb, Prometheus doesn't have its own buffer pool, it has only a single page for writing. This buffer page is flushed into a file (A.K.A. segment) inside of WAL once it's full. The layout of the WAL folder is like this:
 ```
 17728 -rw-r--r-- 1 actiontech-universe actiontech 18153472 2月   9 03:00 00000076
@@ -431,11 +433,11 @@ These two outputs show that checkpoint.00000010 is created right after 00000012.
 
 # Conclusion
 
-mmap is an old concept, it was born at a time when computer memories were small and programs weren't multi-threading. mmap based file IO is hard-beaten by direct IO in benchmark due to problems mentioned above.
+mmap is an old concept, it was born at a time when computer memories were small and programs weren't multi-threading. mmap based file IO is beaten hard by direct IO in benchmark due to problems mentioned above.
 The TSDB of Prometheus works like a log structured merge tree. Unlike relational databases such as MySQL,Postgresql, the workload of Prometheus is write-heavy, new data is constantly written to Prometheus's head chunk, which indeed is buffered and is not memory-mapped, performance issues that hurt mmap are irrelevant in this regard.
 Andy's paper references VictoriaMetrics's tech article "mmap may slow down your Go app" and tries to show that mmap is a problem for VictoriaMetrics. However, this is not true and VictoriaMetrics still uses mmap for file IO.
 
-References
+# References
 1. https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html
 2. https://grafana.com/blog/2020/06/10/new-in-prometheus-v2.19.0-memory-mapping-of-full-chunks-of-the-head-block-reduces-memory-usage-by-as-much-as-40/
 3. https://github.com/prometheus/prometheus
